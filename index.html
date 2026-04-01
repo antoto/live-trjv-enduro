@@ -19,6 +19,23 @@
             margin: 0; padding: 0; background: var(--bg); color: var(--text); line-height: 1.4;
         }
 
+        /* Style de l'écran de blocage */
+        #blocking-layer {
+            display: none; /* Masqué par défaut */
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--primary);
+            color: white;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+        #blocking-layer h2 { font-size: 2rem; margin-bottom: 10px; }
+        #blocking-layer p { opacity: 0.8; font-size: 1.1rem; }
+
         .header { 
             background: var(--primary); color: white; padding: 20px 15px; text-align: center; 
             position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
@@ -102,6 +119,12 @@
 </head>
 <body>
 
+    <div id="blocking-layer">
+        <span style="font-size: 4rem;">⏱️</span>
+        <h2>Résultats temporairement indisponibles</h2>
+        <p>Le live sera de retour dans quelques instants.</p>
+    </div>
+
     <div class="header">
         <h1>🚵 TRJV LILLEBONNE 2026</h1>
     </div>
@@ -142,6 +165,10 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+        // --- CONFIGURATION DE BLOCAGE ---
+        // Changez false par true pour bloquer la page immédiatement
+        const PAGE_BLOCKED = false; 
+
         const firebaseConfig = {
             apiKey: "AIzaSyDnTfXUTYUMi7Kv6hFV3h0o798oNlbBK8M",
             authDomain: "trjv-enduro-2026.firebaseapp.com",
@@ -156,6 +183,12 @@
         const db = getDatabase(app);
         let pilotes = [];
 
+        // Gestion du blocage au chargement
+        if (PAGE_BLOCKED) {
+            document.getElementById('blocking-layer').style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Empêche le scroll
+        }
+
         function formatChrono(ms) {
             if (ms <= 0) return "--:--";
             let totalSec = ms / 1000;
@@ -166,6 +199,9 @@
         }
 
         window.renderPublicTable = function() {
+            // Si bloqué, on ne rend rien du tout
+            if (PAGE_BLOCKED) return;
+
             const container = document.getElementById('classementList');
             const catFiltre = document.getElementById('filterCat').value;
             const sexFiltre = document.getElementById('filterSex').value;
@@ -228,18 +264,21 @@
             }).join('');
         };
 
-        onValue(ref(db, 'pilotes'), (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                pilotes = Object.keys(data).map(id => {
-                    const p = data[id];
-                    const t1 = (p.sp1_finish > p.sp1_start && p.sp1_start > 0) ? (p.sp1_finish - p.sp1_start) : 0;
-                    const t2 = (p.sp2_finish > p.sp2_start && p.sp2_start > 0) ? (p.sp2_finish - p.sp2_start) : 0;
-                    return { id, ...p, t1, t2, totalTime: t1 + t2 };
-                });
-                renderPublicTable();
-            }
-        });
+        // On n'écoute Firebase que si la page n'est pas bloquée
+        if (!PAGE_BLOCKED) {
+            onValue(ref(db, 'pilotes'), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    pilotes = Object.keys(data).map(id => {
+                        const p = data[id];
+                        const t1 = (p.sp1_finish > p.sp1_start && p.sp1_start > 0) ? (p.sp1_finish - p.sp1_start) : 0;
+                        const t2 = (p.sp2_finish > p.sp2_start && p.sp2_start > 0) ? (p.sp2_finish - p.sp2_start) : 0;
+                        return { id, ...p, t1, t2, totalTime: t1 + t2 };
+                    });
+                    renderPublicTable();
+                }
+            });
+        }
     </script>
 </body>
 </html>
